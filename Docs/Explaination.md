@@ -9,3 +9,5 @@ also change in layout add the ThemeProviders given in docs
 after this we have implemented the dark-light theme 
 6. add one more component add in ui named mode-toggle.tsx
 At this point we have successfully added the dark and light mode toggle theme feature
+7. Now adding the tanstack Router (npm i @tanstack/react-query) now we have to set up this 
+8. make the provider query-provider.tsx 
