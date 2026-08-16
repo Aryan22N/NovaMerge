@@ -73,4 +73,8 @@ Besically we are making the flow like if the user is authenticated it should mov
 24. make the file user-menu 
 D:\Final Projects\Nova_Merge\pr_reviewer\features\auth\components\user-menu.tsx
 Whenever you need a user profile menu or sign-out button in headers or sidebars, you simply render <UserMenuWithSession />.
-25. 
+
+Till Now we have completed the auuth Flow
+----------------------------------------------------------------------------------
+
+25. making the ui of dashboard
