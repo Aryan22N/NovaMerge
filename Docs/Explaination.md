@@ -53,4 +53,24 @@ by using (npx prisma generate) this will generate the prisma client
 
 we have sucessfully set up db 
 ----------------------------------------------------------------------------------
-16.
+Now we are going to set up Better Auth
+using (npm install better-auth) add better_auth_secret and better_auth_url in .env file
+16. In lin make the file named auth.ts
+17. using(npx auth@latest generate) to generate all the schemas for auth 
+using npx prisma generate and npx prisma migrate dev to migrate all the tables of auth
+18. Now make the folder in app api/auth/[...all]/route.ts
+19. In gitHub in settings in Developer settings in OAuth apps add the github app
+In app we made the folder (auth) in that another folder sign-in with file page.tsx
+20. make another folder in root named features inside it another 3 folder one is auth ,ai,github
+in components add file named github-sign-in-form.tsx 
+in action add index.ts
+21. make the utils folder in features/auth also one file index.ts here This utility ensures all login redirects in your Server Actions and client components are internal-only and safe, keeping user authentication secure.
+
+Besically we are making the flow like if the user is authenticated it should move to dashboard but if not then it should move to login page , if user expelicitely type /sign-in and user is authenticated then it should move to dashboard 
+
+22. Making proxy.ts file in the root 
+23. again make one utility function named auth-proxt.ts 
+24. make the file user-menu 
+D:\Final Projects\Nova_Merge\pr_reviewer\features\auth\components\user-menu.tsx
+Whenever you need a user profile menu or sign-out button in headers or sidebars, you simply render <UserMenuWithSession />.
+25. 
