@@ -1,6 +1,6 @@
-# Nova Merge / PR Reviewer - Detailed Project Architecture & Setup Guide
+# Nova Merge / PR Reviewer — Detailed Project Architecture & Setup Guide
 
-This document provides a comprehensive, step-by-step breakdown of how the project is configured, the technology stack chosen, why each library/tool is used, how the code works under the hood, and the exact purpose of every file and directory created in the repository.
+This document provides a comprehensive, step-by-step breakdown of how the project is configured, the technology stack chosen, why each library/tool is used, how the code works under the hood, and the exact purpose of every file and directory created in the repository — from project initialization through to the complete GitHub App connection flow.
 
 ---
 
@@ -31,6 +31,17 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
 24. [Authentication Proxy Logic (`auth-proxy.ts`)](#24-authentication-proxy-logic-auth-proxyts)
 25. [Root Middleware / Proxy Integration (`proxy.ts`)](#25-root-middleware--proxy-integration-proxyts)
 26. [User Profile & Session Menu Component (`user-menu.tsx`)](#26-user-profile--session-menu-component-user-menutsx)
+27. [Dashboard UI Shell & Navigation](#27-dashboard-ui-shell--navigation)
+28. [ngrok Tunnel for Webhook Development](#28-ngrok-tunnel-for-webhook-development)
+29. [GitHub App Registration (Developer Settings)](#29-github-app-registration-developer-settings)
+30. [Octokit Installation](#30-octokit-installation)
+31. [GitHub App Singleton (`github-app.ts`)](#31-github-app-singleton-github-appts)
+32. [GithubInstallation Database Model](#32-githubinstallation-database-model)
+33. [Installation Server Functions (`installation.ts`)](#33-installation-server-functions-installationts)
+34. [GitHub App Callback API Route](#34-github-app-callback-api-route)
+35. [GitHub App Server Action — Disconnect](#35-github-app-server-action--disconnect)
+36. [GitHub Connect Card UI Component](#36-github-connect-card-ui-component)
+37. [GitHub App Dashboard Page](#37-github-app-dashboard-page)
 
 ---
 
@@ -39,12 +50,12 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
   ```bash
   npx create-next-app@latest
   ```
-- **Why it is used**: Next.js is a production-grade React framework offering hybrid rendering (Server Side Rendering - SSR, Static Site Generation - SSG, Server-Side React Components - RSC), built-in API routing, automatic code splitting, optimized image assets, and full TypeScript support out of the box.
+- **Why it is used**: Next.js is a production-grade React framework offering hybrid rendering (SSR, SSG, RSC), built-in API routing, automatic code splitting, optimized image assets, and full TypeScript support out of the box.
 - **What it is doing**: It bootstraps a structured React project using Next.js App Router (`app/` directory), configures Tailwind CSS, ESLint, TypeScript compilation rules (`tsconfig.json`), and installs base npm dependencies (`package.json`).
 - **How the code works with this**: All pages, layouts, and API routes reside inside the `app/` directory. Next.js maps the filesystem structure directly to browser URLs (e.g. `app/(auth)/sign-in/page.tsx` maps to `/sign-in`).
 - **Use of files and folders**:
   - `app/`: Contains all App Router layouts, pages, loading UI, error boundaries, and API endpoints.
-  - `public/`: Stores static public assets such as SVGs, logos (`/logo2.svg`), icons, and fonts.
+  - `public/`: Stores static public assets such as SVGs, logos, icons, and fonts.
   - `next.config.ts`: Central Next.js configuration for build settings, compiler flags, and environment variables.
 
 ---
@@ -151,7 +162,7 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
   Grants Prisma ORM secure encrypted access to execute SQL queries.
 - **How the code works with this**: Prisma client reads `process.env.DATABASE_URL` at runtime to query PostgreSQL.
 - **Use of files and folders**:
-  - `.env`: Holds confidential credentials (`DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`). **Must be listed in `.gitignore`** so secrets are never pushed to GitHub.
+  - `.env`: Holds confidential credentials (`DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`). **Must be listed in `.gitignore`** so secrets are never pushed to GitHub.
 
 ---
 
@@ -161,7 +172,7 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
   npm install prisma @types/pg --save-dev
   npm install @prisma/client @prisma/adapter-pg pg dotenv
   ```
-- **Why it is used**: Serverless Next.js environments (Vercel/Node.js) require efficient database pool connection handling. `@prisma/adapter-pg` paired with `pg` enables Prisma ORM to run over standard serverless database connections without exhausting database connections.
+- **Why it is used**: Serverless Next.js environments require efficient database pool connection handling. `@prisma/adapter-pg` paired with `pg` enables Prisma ORM to run over standard serverless database connections without exhausting database connections.
 - **What it is doing**: Installs Prisma CLI for schema management (`prisma`), the generated type-safe ORM runtime (`@prisma/client`), and PostgreSQL connection pool adapters (`@prisma/adapter-pg`).
 - **How the code works with this**: Provides autocompleted, type-safe database queries such as `prisma.user.findUnique()`.
 
@@ -265,6 +276,11 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
 - **Use of files and folders**:
   - `lib/auth.ts`: Server-side authentication configuration using Prisma adapter and GitHub OAuth credentials.
   - `lib/auth-client.ts`: Client-side helper exposing React hooks for auth state management.
+- **Environment Variables Required**:
+  ```env
+  BETTER_AUTH_SECRET=<random_secret>
+  BETTER_AUTH_URL=https://<ngrok-or-production-url>
+  ```
 
 ---
 
@@ -278,6 +294,11 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
 - **Why it is used**: Better Auth requires relational database tables (`User`, `Session`, `Account`, `Verification`).
 - **What it is doing**: `npx auth@latest generate` automatically injects the required Better Auth tables directly into `prisma/schema.prisma`. Then `prisma migrate dev` creates and runs the corresponding SQL statements on Neon Postgres.
 - **How the code works with this**: Allows Better Auth to read and store authenticated users, linked social accounts, and session tokens natively inside your PostgreSQL database.
+- **Models added to `schema.prisma`**:
+  - `User` — stores user identity (id, name, email, emailVerified, image)
+  - `Session` — stores session tokens linked to users
+  - `Account` — links OAuth providers (github) to users
+  - `Verification` — stores email/token verification entries
 
 ---
 
@@ -299,7 +320,7 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
 
 ### 19. GitHub OAuth App Setup & Sign-In Page
 - **Action**:
-  1. Registered a GitHub Developer OAuth App:
+  1. Registered a GitHub Developer **OAuth App** (under GitHub → Settings → Developer settings → OAuth Apps):
      - Homepage URL: `http://localhost:3000`
      - Authorization callback URL: `http://localhost:3000/api/auth/callback/github`
   2. Set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in `.env`.
@@ -310,6 +331,7 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
 - **Use of files and folders**:
   - `app/(auth)/`: Route group (parentheses prevent route URL prefixing) grouping authentication pages under a shared, centered `layout.tsx`.
   - `app/(auth)/sign-in/page.tsx`: The sign-in page component.
+- **Important distinction**: This OAuth App is **separate** from the GitHub App created later. The OAuth App is purely for user login; the GitHub App is for repository access and webhook events.
 
 ---
 
@@ -320,13 +342,11 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
       - `components/github-sign-in-form.tsx`: Client form component displaying "Continue with GitHub", managing submission states (`useFormStatus`), and rendering spinner icons.
       - `actions/index.ts`: Next.js Server Action (`"use server"`) calling `auth.api.signInSocial({ provider: "github", callbackURL: "/dashboard" })` to trigger OAuth redirection safely on the server.
     - `features/ai/`: Reserved module for AI code review processing logic.
-    - `features/github/`: Reserved module for GitHub PR fetching and webhook event listeners.
+    - `features/github/`: Module for GitHub App integration, installation management, and webhook processing.
+    - `features/dashboard/`: Module for all dashboard UI components, navigation routes, and shared types.
 - **Why it is used**: Feature-driven organization scales cleanly as applications grow, keeping UI components, server actions, API helpers, and state hooks co-located by feature domain rather than fragmented across global folders.
-- **What it is doing**:
-  - `github-sign-in-form.tsx` uses `useFormStatus()` to provide immediate user feedback ("Redirecting to GitHub…") when submitting.
-  - `actions/index.ts` handles the server action redirect safely without exposing secrets to client bundles.
 - **Security & `.gitignore` Rule**:
-  - All secret files (`.env`, `.env.local`, `.env.production`) containing database credentials (`DATABASE_URL`), secret auth keys (`BETTER_AUTH_SECRET`), and OAuth client secrets (`GITHUB_CLIENT_SECRET`) are explicitly specified inside `.gitignore`.
+  - All secret files (`.env`, `.env.local`, `.env.production`) are explicitly specified inside `.gitignore`.
   - This guarantees that secret keys are **never** committed or leaked to public or private version control repositories.
 
 ---
@@ -418,3 +438,368 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
   // In app/page.tsx or app/(protected)/dashboard/page.tsx
   <UserMenuWithSession variant="compact" />
   ```
+
+---
+
+### 27. Dashboard UI Shell & Navigation
+- **Files Created**:
+  - `features/dashboard/components/dashboard-sidebar.tsx`
+  - `features/dashboard/components/dashboard-nav.tsx`
+  - `features/dashboard/components/dashboard-shell.tsx`
+  - `features/dashboard/components/dashboard-header.tsx`
+  - `features/dashboard/components/sidebar-user-button.tsx`
+  - `features/dashboard/lib/routes.ts`
+  - `features/dashboard/lib/types.ts`
+  - `features/dashboard/lib/status-style.ts`
+- **Why it is used**: Provides a consistent, reusable dashboard layout shell used across all dashboard pages (Overview, Repositories, Pull Requests, GitHub App, Settings).
+- **What it is doing**:
+  - `dashboard-sidebar.tsx`: Renders the left sidebar containing the logo, navigation items, and the bottom user button.
+  - `dashboard-nav.tsx`: Renders navigation links using `DASHBOARD_NAV_ITEMS`, highlighting the active route.
+  - `dashboard-shell.tsx`: The main layout wrapper combining sidebar and content area.
+  - `dashboard-header.tsx`: Top section of each page showing the page title and description.
+  - `sidebar-user-button.tsx`: Compact user avatar + name displayed at the bottom of the sidebar.
+  - `routes.ts`: Exports `DASHBOARD_ROUTES` (route path constants) and `DASHBOARD_NAV_ITEMS` (navigation configuration array used to build sidebar links):
+    ```ts
+    export const DASHBOARD_ROUTES = {
+        overview: "/dashboard",
+        repos: "/dashboard/repos",
+        pullRequest: "/dashboard/pull-request",
+        github: "/dashboard/github",
+        settings: "/dashboard/settings",
+    } as const;
+    ```
+  - `types.ts`: Exports shared TypeScript types used across dashboard features (e.g., `GithubInstallationStatus`).
+  - `status-style.ts`: Exports utility functions for consistent status badge/button styling (`statusBadge()`, `statusButtonClass`).
+- **How the code works with this**: `app/(protected)/dashboard/layout.tsx` wraps all dashboard pages inside the `DashboardShell`, so every page under `/dashboard/*` inherits the same sidebar and layout structure automatically.
+
+---
+
+### 28. ngrok Tunnel for Webhook Development
+- **Command Used**:
+  ```bash
+  ngrok http 3000 --domain=<your-ngrok-domain> --host-header=rewrite
+  ```
+  Example:
+  ```bash
+  ngrok http 3000 --domain=manhole-ducking-retread.ngrok-free.dev --host-header=rewrite
+  ```
+- **Why it is used**: GitHub App webhooks require a **publicly accessible HTTPS URL**. During local development, `localhost:3000` is not reachable from the internet. ngrok creates a secure tunnel from a public URL to your local server.
+- **What it is doing**: All inbound HTTPS requests to `https://<ngrok-domain>` are forwarded in real time to `http://localhost:3000`. This allows GitHub to deliver webhook payloads to your locally running Next.js app.
+- **How the code works with this**:
+  - The `BETTER_AUTH_URL` in `.env` is set to the ngrok domain so OAuth callback URLs are valid.
+  - The GitHub App webhook URL is set to `https://<ngrok-domain>/api/github/webhook`.
+- **Important**: The ngrok tunnel must be running **before** any GitHub webhook events are triggered. The terminal command stays running for as long as the tunnel is needed.
+
+---
+
+### 29. GitHub App Registration (Developer Settings)
+- **Action**: Registering a **GitHub App** (under GitHub → Settings → Developer settings → GitHub Apps → New GitHub App)
+- **Why it is used**: A GitHub App is fundamentally different from an OAuth App. It:
+  - Can be **installed on specific repositories** (not just user-level auth)
+  - Receives **webhook events** for repository/PR activity
+  - Uses **short-lived installation tokens** (not user OAuth tokens) to access the GitHub API
+  - Has **fine-grained permissions** (read PRs, post comments, read metadata)
+- **Configuration required**:
+  | Field | Value |
+  |---|---|
+  | App name | `novamerge` |
+  | Homepage URL | `https://<ngrok-domain>` |
+  | Webhook URL | `https://<ngrok-domain>/api/github/webhook` |
+  | Webhook secret | A random secret (stored as `GITHUB_WEBHOOK_SECRET` in `.env`) |
+  | Permissions | Pull requests (read & write), Repository metadata (read) |
+  | Subscribe to events | Pull request, Pull request review |
+- **After registration**:
+  - Copy the **App ID** → stored as `GITHUB_APP_ID` in `.env`
+  - Generate a **private key** (`.pem` file) → content stored as `GITHUB_APP_PRIVATE_KEY` in `.env` (with newlines escaped as `\n`)
+  - Note the **App name** (slug) → stored as `GITHUB_APP_NAME=novamerge` in `.env`
+  - Note the **Public installation link** → stored as `NEXT_PUBLIC_GITHUB_PUBLIC_LINK` in `.env`
+- **Environment variables added**:
+  ```env
+  GITHUB_APP_ID=4637918
+  GITHUB_APP_NAME=novamerge
+  NEXT_PUBLIC_GITHUB_PUBLIC_LINK=https://github.com/apps/novamerge
+  GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n"
+  GITHUB_WEBHOOK_SECRET=<random_secret>
+  GIT_WEBHOOK_SECRET=<same_random_secret>
+  ```
+- **Why `state` param matters**: When a user clicks "Install GitHub App", the install URL includes a `state=userId` query parameter. After GitHub completes the installation, it redirects the browser back to the **callback URL** with `installation_id` and `state` — allowing the app to associate the GitHub installation with the correct user account in the database.
+
+---
+
+### 30. Octokit Installation
+- **Command Used**:
+  ```bash
+  npm i octokit
+  ```
+- **Why it is used**: `octokit` is the official, comprehensive GitHub SDK for Node.js. It provides:
+  - `App` class — for GitHub App authentication (using App ID + private key)
+  - `Octokit` class — for GitHub REST API calls
+  - Webhook handling and verification utilities
+- **What it is doing**: Installs the `octokit` npm package which exposes the `App` constructor used to initialize the GitHub App client with private key authentication.
+- **How the code works with this**: The `App` instance authenticates as the GitHub App itself, then generates short-lived **installation tokens** scoped to a specific repository installation using `app.getInstallationOctokit(installationId)`.
+
+---
+
+### 31. GitHub App Singleton (`github-app.ts`)
+- **File Created**: `features/github/utils/github-app.ts`
+- **Why it is used**: Just like the Prisma singleton in `lib/db.ts`, instantiating a new `App` (Octokit) on every server request is wasteful and can cause memory/token issues. A module-level singleton ensures a single shared instance.
+- **What it is doing**:
+  ```ts
+  import { App } from 'octokit';
+
+  let gitHubApp: App | null = null;
+
+  export function getGithubApp() {
+      if (!gitHubApp) {
+          gitHubApp = new App({
+              appId: process.env.GITHUB_APP_ID!,
+              privateKey: process.env.GITHUB_APP_PRIVATE_KEY!.replace(/\\n/g, "\n"),
+              webhooks: {
+                  secret: process.env.GITHUB_WEBHOOK_SECRET || process.env.GIT_WEBHOOK_SECRET || ""
+              }
+          });
+      }
+      return gitHubApp;
+  }
+
+  export function getGithubInstallUrl(userId: string) {
+      const url = new URL(`https://github.com/apps/novamerge/installations/new`);
+      url.searchParams.set("state", userId);
+      return url.toString();
+  }
+  ```
+- **Key details**:
+  - `privateKey.replace(/\\n/g, "\n")` — The private key is stored in `.env` with literal `\n` characters (since `.env` files don't support real newlines in multi-line values). This replace converts them back to actual newline characters before passing to Octokit, which is required for RSA key parsing.
+  - `webhooks.secret` — Used by Octokit to verify the HMAC-SHA256 signature on incoming webhook payloads, ensuring they truly originate from GitHub.
+  - `getGithubInstallUrl(userId)` — Builds the public installation URL with `state=userId`. After the user completes installation on GitHub, GitHub redirects to the app's callback URL with both `installation_id` and `state`, enabling the callback handler to securely associate the installation with the correct user.
+- **Use of files and folders**:
+  - `features/github/utils/github-app.ts`: Single export point for GitHub App client and install URL builder.
+
+---
+
+### 32. GithubInstallation Database Model
+- **File Modified**: `prisma/schema.prisma`
+- **Why it is used**: The database needs to store the mapping between a user account and their GitHub App installation. This is needed to:
+  - Check if a user has connected GitHub (`getInstallationStatus`)
+  - Retrieve the `installationId` to make API calls on behalf of the user's repositories
+  - Associate incoming webhook events with the correct user
+- **Model added**:
+  ```prisma
+  model GithubInstallation {
+    id             String   @id @default(cuid())
+    userId         String   @unique
+    user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    installationId Int      // GitHub's numeric installation ID — passed to app.getInstallationOctokit()
+    accountLogin   String?  // GitHub username or organization slug
+    accountType    String?  // "User" or "Organization"
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    @@map("github_installation")
+  }
+  ```
+- **Key design decisions**:
+  - `userId` is marked `@unique` — one user can only have one active GitHub App installation at a time. Re-installing overwrites via `upsert`.
+  - `onDelete: Cascade` — if the user is deleted, their installation record is automatically removed.
+  - `installationId` is `Int` (not String) — GitHub returns it as a number in API responses and webhook payloads.
+  - `accountLogin` and `accountType` are nullable — fetched from GitHub API at installation time, not always present.
+- **Migration command**:
+  ```bash
+  npx prisma migrate dev
+  npx prisma generate
+  ```
+- **Updated `User` model** gains a relation field:
+  ```prisma
+  githubInstallations GithubInstallation[]
+  ```
+
+---
+
+### 33. Installation Server Functions (`installation.ts`)
+- **File Created**: `features/github/server/installation.ts`
+- **Why it is used**: Centralizes all database operations related to GitHub App installations. By isolating this logic in a `server/` sub-folder, it is clearly marked as server-only code (not importable from client components).
+- **Functions and what they do**:
+
+  #### `getInstallationStatus(userId: string) → GithubInstallationStatus`
+  - Queries `prisma.githubInstallation.findUnique({ where: { userId } })`
+  - If no record exists → returns `{ connected: false, accountLogin: null, installedAt: null }`
+  - If record exists → returns `{ connected: true, accountLogin, installedAt: createdAt.toISOString() }`
+  - Used by `app/(protected)/dashboard/github/page.tsx` to determine UI state (connected vs. disconnected card)
+
+  #### `saveInstallation(userId: string, installationId: number)`
+  - Calls GitHub REST API via `app.octokit.request("GET /app/installations/{installation_id}", { installation_id: installationId })` to fetch installation metadata
+  - Extracts `accountLogin` from the response (handles both User type with `.login` and Org type with `.slug`)
+  - Upserts into `prisma.githubInstallation`:
+    - If no existing record → **creates** a new row
+    - If record exists → **updates** `installationId`, `accountLogin`, `accountType`
+  - This ensures reconnecting/reinstalling works seamlessly without duplicate records
+
+  #### `deleteInstallation(userId: string)`
+  - Calls `prisma.githubInstallation.delete({ where: { userId } })`
+  - Used by the `disconnectGithubApp` server action
+
+  #### `getUserIdByInstallationId(installationId: number) → string | null`
+  - Reverse-lookup: given a GitHub installation ID (from a webhook payload), find the associated `userId`
+  - Used by webhook handlers to identify which user's repositories sent the event
+
+  #### `getUserInstallationId(userId: string) → number | null`
+  - Forward-lookup: given a `userId`, find their GitHub installation ID
+  - Used when making GitHub API calls on behalf of a user (e.g., fetching their repositories or PR list)
+
+- **Helper functions**:
+  - `getAccountLogin(account)` — safely extracts `login` or `slug` from the GitHub API response's `account` field (handles different account object shapes)
+  - `buildDisconnectedStatus()` — returns the standard disconnected status object
+
+- **Use of files and folders**:
+  - `features/github/server/installation.ts`: The single source of truth for all GitHub installation database operations.
+
+---
+
+### 34. GitHub App Callback API Route
+- **File Created**: `app/api/github/callback/route.ts`
+- **Why it is used**: After a user clicks "Install GitHub App" and completes the GitHub installation flow, GitHub redirects the browser back to this callback URL with `?installation_id=<id>&state=<userId>`.
+- **What it is doing**:
+  ```ts
+  export async function GET(request: Request) {
+      const { searchParams } = new URL(request.url);
+      const installationId = searchParams.get("installation_id");
+      const session = await getServerSession();
+
+      if (!session) {
+          const callbackUrl = buildSignInCallbackUrl(installationId);
+          redirect(`/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+      }
+
+      if (installationId) {
+          await saveInstallation(session.user.id, Number(installationId));
+      }
+
+      redirect(DASHBOARD_ROUTES.github);
+  }
+  ```
+- **Full flow explained**:
+  1. User clicks "Install GitHub App" → browser navigates to `https://github.com/apps/novamerge/installations/new?state=<userId>`
+  2. User authorizes on GitHub
+  3. GitHub redirects to `https://<ngrok-domain>/api/github/callback?installation_id=123456&state=<userId>`
+  4. The route handler reads `installation_id` from query params
+  5. It verifies the user is authenticated (using `getServerSession()`)
+  6. If **not authenticated**: preserves the `installation_id` in the `callbackUrl` so after signing in, the install is still saved
+  7. If **authenticated**: calls `saveInstallation(session.user.id, installationId)` to persist the record
+  8. Redirects to `/dashboard/github` where the connected state is shown
+- **Edge case handled**: If a user installs the app before being logged in (e.g., they followed a direct link), the callback URL is preserved through the sign-in flow and re-processed after login.
+- **Use of files and folders**:
+  - `app/api/github/callback/route.ts`: Dedicated GET handler for the post-installation redirect.
+
+---
+
+### 35. GitHub App Server Action — Disconnect
+- **File Created**: `features/github/actions/index.ts`
+- **Why it is used**: Provides a type-safe, server-side action for the disconnect button in the GitHub Connect Card UI.
+- **What it is doing**:
+  ```ts
+  "use server";
+
+  export async function disconnectGithubApp() {
+      const session = await getServerSession();
+
+      if (!session) {
+          redirect("/sign-in");
+      }
+
+      await deleteInstallation(session.user.id);
+      redirect(DASHBOARD_ROUTES.github);
+  }
+  ```
+- **How the code works with this**:
+  - Marked `"use server"` — runs exclusively on the server; the client only sees a function reference
+  - Verifies authentication before attempting deletion (security guard)
+  - Calls `deleteInstallation` from `features/github/server/installation.ts`
+  - Redirects back to `/dashboard/github` after deletion so the UI immediately reflects the disconnected state
+  - Used as a form action in `GithubConnectCard`: `<form action={disconnectGithubApp}>`
+- **Use of files and folders**:
+  - `features/github/actions/index.ts`: GitHub feature server actions module.
+
+---
+
+### 36. GitHub Connect Card UI Component
+- **File Created**: `features/dashboard/components/github-connect-card.tsx`
+- **Why it is used**: Provides the primary UI for the GitHub App integration page — showing connection status and allowing users to install or disconnect the app.
+- **What it is doing**:
+  - `GithubConnectCard({ userId, installation })` — main exported component
+  - Receives `userId` (to build install URL) and `installation` (status from DB)
+  - Dynamically switches between two states based on `installation.connected`:
+
+  **Connected state**:
+  - Green border (`border-green-500/30`) and green icon wrapper
+  - "Connected" badge
+  - Shows `@accountLogin` with message about permissions granted
+  - Renders a "Disconnect GitHub App" button (`<form action={disconnectGithubApp}>`)
+
+  **Disconnected state**:
+  - Neutral border and muted icon wrapper
+  - "Not connected" badge
+  - Shows bullet list of what the app can do (access repos, receive webhooks, post AI reviews)
+  - Renders an "Install GitHub App" anchor button linking to `getGithubInstallUrl(userId)`
+
+- **Key sub-components**:
+  ```
+  GithubConnectCard
+  ├── CardHeader
+  │   ├── GithubLogo icon (green or muted)
+  │   └── status badge (Connected / Not connected)
+  ├── CardContent
+  │   └── ConnectionDetails → ConnectedDetails | DisconnectedDetails
+  └── CardFooter
+      └── ConnectionActions → ConnectedActions | DisconnectedActions
+  ```
+- **Install URL structure**:
+  ```
+  https://github.com/apps/novamerge/installations/new?state=<userId>
+  ```
+  The `state` parameter is critical — it is echoed back by GitHub in the callback redirect, allowing the callback handler to associate the installation with the correct user without relying on a session cookie (which may not be present in the callback flow if the user installed before logging in).
+
+- **How the code works with this**: The page `app/(protected)/dashboard/github/page.tsx` fetches session + installation status server-side and passes them as props to this client component. The client component renders the correct state and handles user interactions.
+
+- **Use of files and folders**:
+  - `features/dashboard/components/github-connect-card.tsx`: Isolated, reusable card component for GitHub App connection management.
+  - `features/dashboard/lib/status-style.ts`: Provides `statusBadge(tone)` and `statusButtonClass` for consistent visual styling of connection states.
+  - `features/dashboard/lib/types.ts`: Exports `GithubInstallationStatus` type used as the `installation` prop type.
+
+---
+
+### 37. GitHub App Dashboard Page
+- **File Created**: `app/(protected)/dashboard/github/page.tsx`
+- **Why it is used**: The server-rendered page that orchestrates data fetching and renders the GitHub App connection UI.
+- **What it is doing**:
+  ```tsx
+  export const metadata: Metadata = {
+      title: "GitHub App · Dashboard",
+  };
+
+  const DashboardGithubPage = async () => {
+      const session = await requireAuth();
+      const installation = await getInstallationStatus(session.user.id);
+
+      return (
+          <>
+              <DashboardHeader
+                  title="GitHub App"
+                  description="Install or disconnect the reviewer app on your GitHub account."
+              />
+              <GithubConnectCard userId={session.user.id} installation={installation} />
+          </>
+      );
+  };
+  ```
+- **Data flow**:
+  1. `requireAuth()` — ensures only authenticated users can reach this page; returns session
+  2. `getInstallationStatus(session.user.id)` — queries DB for GitHub installation record
+  3. Renders `DashboardHeader` with page title and description
+  4. Passes `userId` and `installation` status to `GithubConnectCard` for rendering
+- **How the code works with this**:
+  - As an `async` Server Component, data is fetched before any HTML is sent to the browser
+  - No client-side loading states or spinners needed — the page arrives fully populated
+  - Nested inside `app/(protected)/layout.tsx` which already calls `requireAuth()`, but calling it again in the page returns the session object which is needed for the user ID
+- **Route**: `/dashboard/github`
+- **Use of files and folders**:
+  - `app/(protected)/dashboard/github/page.tsx`: The GitHub App management page in the dashboard.

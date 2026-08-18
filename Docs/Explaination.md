@@ -89,3 +89,159 @@ ngrok http 3000 --domain=manhole-ducking-retread.ngrok-free.dev --host-header=re
 
 After doing this operations 
 we need to install the package called (npm i octokit)
+--------------------------------------------------------------
+Complete till GitHub app Installation and App connection 
+---------------------------------------------------------------
+
+# Nova Merge — Project Setup (Pointwise)
+
+---
+
+## ⚙️ 1. Project Initialization
+- Bootstrapped Next.js using `npx create-next-app@latest`
+- App Router (`app/` dir), TypeScript, Tailwind CSS enabled by default
+
+---
+
+## 🎨 2. shadcn/ui Design System
+- Initialized via `npx shadcn@latest init --preset b6GMM7ajb --template next --pointer`
+- Config stored in `components.json`; utility function in `lib/utils.ts` (`cn()`)
+- Components added via `npx shadcn@latest add <component>`
+
+---
+
+## 🌗 3. Dark / Light Mode
+- Installed `next-themes` via `npm install next-themes`
+- Created `components/providers/theme-provider.tsx` (client wrapper)
+- Wrapped `app/layout.tsx` children with `<ThemeProvider>`
+- Added toggle component: `components/ui/mode-toggle.tsx`
+
+---
+
+## 🔄 4. TanStack React Query
+- Installed via `npm i @tanstack/react-query`
+- Created `components/providers/query-provider.tsx` — provides global `QueryClient`
+- Wrapped in `app/layout.tsx` alongside theme provider
+
+---
+
+## 🗄️ 5. Database — Neon PostgreSQL + Prisma
+- Provisioned **Neon** serverless Postgres; added `DATABASE_URL` to `.env`
+- Installed Prisma: `npm install prisma @types/pg --save-dev`
+- Installed client + adapters: `npm install @prisma/client @prisma/adapter-pg pg dotenv`
+- Initialized: `npx prisma init` → creates `prisma/schema.prisma`
+- Created singleton DB client in `lib/db.ts` (prevents HMR connection leaks)
+- Added test model, ran `npx prisma migrate dev` + `npx prisma generate`
+
+---
+
+## 🔐 6. Authentication — Better Auth
+- Installed: `npm install better-auth`
+- Added `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` to `.env`
+- Created `lib/auth.ts` (server config) and `lib/auth-client.ts` (client hooks)
+- Generated auth schemas: `npx auth@latest generate` → injected User, Session, Account, Verification tables into `schema.prisma`
+- Migrated: `npx prisma migrate dev`
+- Created catch-all API route: `app/api/auth/[...all]/route.ts`
+
+---
+
+## 🐙 7. GitHub OAuth — Sign In
+- Registered a **GitHub OAuth App** in Developer Settings:
+  - Homepage URL: `http://localhost:3000`
+  - Callback URL: `http://localhost:3000/api/auth/callback/github`
+- Added `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` to `.env`
+- Created `app/(auth)/sign-in/page.tsx` with shared `app/(auth)/layout.tsx`
+- Sign-in logic lives in `features/auth/components/github-sign-in-form.tsx` + `features/auth/actions/index.ts`
+
+---
+
+## 🏗️ 8. Feature-Driven Architecture
+- Root `features/` folder with sub-modules: `auth/`, `ai/`, `github/`, `dashboard/`
+- Each module owns its own `components/`, `actions/`, `server/`, `utils/`
+
+---
+
+## 🛡️ 9. Auth Utilities & Route Protection
+- `features/auth/utils/index.ts` — safe callback path guard (prevents open redirects), route constants (`SIGN_IN_PATH`, `DEFAULT_AUTH_CALLBACK`)
+- `features/auth/actions/index.ts` — `getServerSession()`, `requireAuth()`, `requireUnauth()` server helpers
+- `app/(auth)/layout.tsx` — calls `requireUnauth()` (redirects logged-in users away from sign-in)
+- `app/(protected)/layout.tsx` — calls `requireAuth()` (redirects guests to sign-in)
+
+---
+
+## 🔀 10. Middleware / Proxy
+- `features/auth/utils/auth-proxy.ts` — edge-level route guard logic (`handleAuthProxy`)
+- `proxy.ts` (root) — delegates to `handleAuthProxy`; matched on `/sign-in`, `/dashboard`, `/dashboard/:path*`
+
+---
+
+## 👤 11. User Menu Component
+- `features/auth/components/user-menu.tsx`
+- `<UserMenu />` — presentational dropdown with avatar, initials fallback, sign-out
+- `<UserMenuWithSession />` — smart wrapper using `authClient.useSession()`, used in headers/sidebars
+
+---
+
+## 🖥️ 12. Dashboard UI
+- Dashboard shell built with Shadcn/ui components
+- Sidebar navigation defined in `features/dashboard/lib/routes.ts` (`DASHBOARD_NAV_ITEMS`)
+- Routes: Overview, Repositories, Pull Requests, **GitHub App**, Settings
+- Components: `dashboard-sidebar.tsx`, `dashboard-nav.tsx`, `dashboard-shell.tsx`, `dashboard-header.tsx`
+
+---
+
+## 🐙 13. GitHub App Setup (ngrok + Octokit)
+- **Why ngrok?** GitHub App webhooks require a public HTTPS URL → `ngrok http 3000 --domain=<your-domain>`
+- Registered a **GitHub App** in Developer Settings (not OAuth App):
+  - Webhook URL: `https://<ngrok-domain>/api/github/webhook`
+  - Webhook secret set and stored as `GITHUB_WEBHOOK_SECRET` in `.env`
+  - Generated a **private key** (`.pem` file); value stored as `GITHUB_APP_PRIVATE_KEY` in `.env`
+  - `GITHUB_APP_ID` stored in `.env`
+  - `GITHUB_APP_NAME=novamerge`; public link: `NEXT_PUBLIC_GITHUB_PUBLIC_LINK`
+- Installed `octokit`: `npm i octokit`
+
+---
+
+## 🔧 14. GitHub App Singleton (`github-app.ts`)
+- `features/github/utils/github-app.ts`
+- `getGithubApp()` — lazy-initializes `octokit.App` with `appId`, `privateKey`, and `webhooks.secret`
+- `getGithubInstallUrl(userId)` — builds the GitHub App install URL with `state=userId` for callback association
+
+---
+
+## 💾 15. GithubInstallation — Database Model
+- Added `GithubInstallation` model to `prisma/schema.prisma`:
+  - Fields: `userId` (unique FK → User), `installationId` (GitHub numeric ID), `accountLogin`, `accountType`, `createdAt`
+- Migrated and generated client
+
+---
+
+## 🔌 16. Installation Server Logic (`installation.ts`)
+- `features/github/server/installation.ts`
+- `getInstallationStatus(userId)` — checks DB for a linked installation
+- `saveInstallation(userId, installationId)` — calls GitHub API to fetch account details, upserts to DB
+- `deleteInstallation(userId)` — removes installation record from DB
+- `getUserIdByInstallationId(installationId)` — reverse-lookup by GitHub installation ID
+- `getUserInstallationId(userId)` — gets GitHub installation ID from DB for a user
+
+---
+
+## 📡 17. GitHub App Callback API Route
+- `app/api/github/callback/route.ts`
+- Handles `GET /api/github/callback?installation_id=<id>`
+- If unauthenticated → redirects to `/sign-in?callbackUrl=...` preserving `installation_id`
+- If authenticated → calls `saveInstallation()` → redirects to `/dashboard/github`
+
+---
+
+## 🔗 18. GitHub App Server Action
+- `features/github/actions/index.ts`
+- `disconnectGithubApp()` — verifies session, calls `deleteInstallation()`, redirects to `/dashboard/github`
+
+---
+
+## 🃏 19. GitHub Connect Card UI
+- `features/dashboard/components/github-connect-card.tsx`
+- Shows **Connected** (green border, account login, disconnect button) or **Disconnected** (feature list, install button)
+- Install button links to `getGithubInstallUrl(userId)` with `state` param for secure callback association
+- Page: `app/(protected)/dashboard/github/page.tsx` — fetches session + installation status server-side
