@@ -43,7 +43,7 @@ export function DashboardNav() {
         <SidebarGroup>
             <SidebarGroupLabel>Workspace</SidebarGroupLabel>
             <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className="gap-1">
                     {DASHBOARD_NAV_ITEMS.map((item) => {
                         const Icon = NAV_ICONS[item.icon];
                         const active = isNavActive(pathname, item.href);
@@ -51,6 +51,7 @@ export function DashboardNav() {
                         return (
                             <SidebarMenuItem key={item.href}>
                                 <SidebarMenuButton
+                                    size="md"
                                     isActive={active}
                                     tooltip={item.title}
                                     render={
