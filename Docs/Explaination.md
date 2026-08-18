@@ -78,3 +78,14 @@ Till Now we have completed the auuth Flow
 ----------------------------------------------------------------------------------
 
 25. making the ui of dashboard
+
+Making of UI dashboard using Shadcn ui 
+-----------------------------------------------------------------------------------
+26. Making the GitHub app , For Repo Fetching 
+    Come in  developer setting in github and 
+But Before we are going to set up ngrok 
+
+ngrok http 3000 --domain=manhole-ducking-retread.ngrok-free.dev --host-header=rewrite
+
+After doing this operations 
+we need to install the package called (npm i octokit)
