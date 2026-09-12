@@ -7,6 +7,7 @@ import {
     GitBranch,
     GithubLogo,
     Gear,
+    GitPullRequest,
 } from "@phosphor-icons/react";
 
 import {
@@ -27,6 +28,7 @@ const NAV_ICONS = {
     "folder-git-2": GitBranch,
     github: GithubLogo,
     settings: Gear,
+    "git-pull-request": GitPullRequest,
 } as const;
 
 function isNavActive(pathname: string, href: DashboardRoute) {
