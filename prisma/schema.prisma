@@ -46,6 +46,21 @@ model GithubInstallation {
   @@map("github_installation")
 }
 
+model RepoSync {
+  id             String    @id @default(cuid())
+  installationId Int
+  repoFullName   String
+  branch         String
+  status         String    @default("pending") // pending | syncing | synced | failed
+  chunkCount     Int       @default(0)
+  syncedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([repoFullName])
+  @@map("repo_sync")
+}
+
 model Session {
   id        String   @id
   expiresAt DateTime
@@ -92,4 +107,23 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+model PullRequest {
+  id             String    @id @default(cuid())
+  installationId Int
+  repoFullName   String // e.g. "owner/repo"
+  prNumber       Int
+  title          String
+  authorLogin    String?
+  headSha        String // latest commit on the PR branch
+  baseBranch     String
+  status         String    @default("pending") // pending | processing | reviewed | rate_limited
+  reviewComment  String? // AI-generated markdown saved after review completes
+  reviewedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([repoFullName, prNumber])
+  @@map("pull_request")
 }

@@ -689,6 +689,41 @@ This document provides a comprehensive, step-by-step breakdown of how the projec
 - **Edge case handled**: If a user installs the app before being logged in (e.g., they followed a direct link), the callback URL is preserved through the sign-in flow and re-processed after login.
 - **Use of files and folders**:
   - `app/api/github/callback/route.ts`: Dedicated GET handler for the post-installation redirect.
+  --------------------------------------------------------------------------------------------
+  9. set up ingest framework
+added INNGEST_DEV=1 in .env 
+also npm install inngest and npx inngest-cli@latest dev
+
+now after we are gona setup ingest client
+
+after that i can see my app http://localhost:8288
+
+Successfully completed the background worker
+
+----------------------------------------------------------------------------------------------
+Now the important part setting up the ai
+
+10. using this command install the ai sdk
+npm install ai
+
+11. setting up open router
+using command npm install @openrouter/ai-sdk-provider
+
+make an api key using the openrouter dashboard and save it in .env file as OPENROUTER_API_KEY
+
+----------------------------------------------------------------------------------------------
+Now we are adding the schema for reposync and made the table and run the command 
+npx prisma migrate dev
+
+----------------------------------------------------------------------------------------------
+now setting up the pinecone database
+
+first create the index and with all the default valuse press create 
+
+Then we have connection for  create connection 
+npm install @pinecone-database/pinecone
+
+addd the pinecone client and added the env variables like index and api key 
 
 ---
 
