@@ -1,6 +1,24 @@
 /** All possible statuses a pull request can be in after webhook ingestion. */
 export type PrStatus = "pending" | "processing" | "reviewed" | "rate_limited";
 
+const VALID_PR_STATUSES = new Set<PrStatus>([
+    "pending",
+    "processing",
+    "reviewed",
+    "rate_limited",
+]);
+
+/**
+ * Runtime sanitizer that converts an arbitrary status string (e.g. from DB)
+ * to a type-safe `PrStatus`, falling back to `"pending"` if unknown.
+ */
+export function toPrStatus(status: string): PrStatus {
+    if (VALID_PR_STATUSES.has(status as PrStatus)) {
+        return status as PrStatus;
+    }
+    return "pending";
+}
+
 /**
  * Lightweight row used in the PR list table.
  * Excludes the heavy `reviewComment` field that is only needed on the detail page.

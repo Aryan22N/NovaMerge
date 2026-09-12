@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import type { PullRequestRow } from "@/features/pull-requests/lib/types";
+import { toPrStatus, type PullRequestRow } from "@/features/pull-requests/lib/types";
 
 /**
  * Fetches all pull requests that belong to the given user's GitHub App installation,
@@ -42,7 +42,7 @@ export async function getPullRequests(userId: string): Promise<PullRequestRow[]>
 
     return rows.map((row) => ({
         ...row,
-        status: row.status as PullRequestRow["status"],
+        status: toPrStatus(row.status),
         reviewedAt: row.reviewedAt ? row.reviewedAt.toISOString() : null,
         updatedAt: row.updatedAt.toISOString(),
     }));

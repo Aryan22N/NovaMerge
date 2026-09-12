@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { getInstallationStatus } from "@/features/github/server/installation";
+import { toPrStatus, type PrStatus } from "@/features/pull-requests/lib/types";
 import type { GithubInstallationStatus } from "@/features/dashboard/lib/types";
 
 /** Aggregated counts for the repository summary card. */
@@ -15,7 +15,7 @@ export type RecentPrActivity = {
     prNumber: number;
     title: string;
     authorLogin: string | null;
-    status: string;
+    status: PrStatus;
     updatedAt: string;
 };
 
@@ -29,32 +29,47 @@ export type OverviewData = {
 /**
  * Aggregates real data for the dashboard Overview page.
  *
- * Runs three independent DB queries:
- * 1. GitHub installation status (re-uses existing `getInstallationStatus`).
+ * Runs two parallel DB queries:
+ * 1. User's GitHub installation record (status + installationId).
  * 2. Repo sync counts (synced vs total).
- * 3. Last 10 pull requests ordered by `updatedAt` desc.
+ *
+ * Followed by an installation-scoped query for the last 10 pull requests.
  *
  * All queries are read-only — no Inngest / webhook / backend logic changed.
  *
  * @param userId - Better-Auth user id from `requireAuth()`.
  */
 export async function getOverview(userId: string): Promise<OverviewData> {
-    const [installation, syncedCount, totalCount, installation2] =
-        await Promise.all([
-            getInstallationStatus(userId),
-            prisma.repoSync.count({ where: { status: "synced" } }),
-            prisma.repoSync.count(),
-            prisma.githubInstallation.findUnique({
-                where: { userId },
-                select: { installationId: true },
-            }),
-        ]);
+    const [installationRecord, syncedCount, totalCount] = await Promise.all([
+        prisma.githubInstallation.findUnique({
+            where: { userId },
+            select: {
+                installationId: true,
+                accountLogin: true,
+                createdAt: true,
+            },
+        }),
+        prisma.repoSync.count({ where: { status: "synced" } }),
+        prisma.repoSync.count(),
+    ]);
+
+    const installation: GithubInstallationStatus = installationRecord
+        ? {
+              connected: true,
+              accountLogin: installationRecord.accountLogin,
+              installedAt: installationRecord.createdAt.toISOString(),
+          }
+        : {
+              connected: false,
+              accountLogin: null,
+              installedAt: null,
+          };
 
     // Recent activity is scoped to the user's installation to avoid showing
     // other users' PRs. Falls back to [] when the user hasn't connected yet.
-    const recentActivityRaw = installation2
+    const recentActivityRaw = installationRecord
         ? await prisma.pullRequest.findMany({
-              where: { installationId: installation2.installationId },
+              where: { installationId: installationRecord.installationId },
               orderBy: { updatedAt: "desc" },
               take: 10,
               select: {
@@ -71,6 +86,7 @@ export async function getOverview(userId: string): Promise<OverviewData> {
 
     const recentActivity: RecentPrActivity[] = recentActivityRaw.map((pr) => ({
         ...pr,
+        status: toPrStatus(pr.status),
         updatedAt: pr.updatedAt.toISOString(),
     }));
 
@@ -80,3 +96,4 @@ export async function getOverview(userId: string): Promise<OverviewData> {
         recentActivity,
     };
 }
+
